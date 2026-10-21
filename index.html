@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de QR Code</title>
+<meta name="description" content="Gere QR codes personalizados e baixe em PNG ou SVG. Tudo acontece no seu navegador.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.9.2/lib/qr-code-styling.js"></script>
+<style>
+  :root {
+    --bg: #f4f1ec;
+    --panel: #ffffff;
+    --ink: #1d1b19;
+    --muted: #6b655e;
+    --line: #e3ddd4;
+    --accent: #2f5d50;
+    --accent-ink: #ffffff;
+    --chip: #f4f1ec;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161514;
+      --panel: #201f1d;
+      --ink: #f1ede7;
+      --muted: #a39c93;
+      --line: #34312d;
+      --accent: #7fbfa9;
+      --accent-ink: #10201b;
+      --chip: #2a2825;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  header { max-width: 1100px; margin: 0 auto; padding: 36px 16px 8px; }
+  h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--muted); }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px 16px 48px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; }
+    .preview { order: -1; position: static !important; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .controls { display: flex; flex-direction: column; gap: 22px; }
+  section h2 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  label.field { display: block; font-weight: 500; margin-bottom: 6px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  input[type="url"], input[type="text"], select, textarea {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* Chips de estilo */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips input { position: absolute; opacity: 0; pointer-events: none; }
+  .chips label {
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--chip);
+    cursor: pointer;
+    font-size: 14px;
+    user-select: none;
+  }
+  .chips input:checked + label {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+  .chips input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Cores */
+  .color {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px 6px 6px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+  }
+  .color input[type="color"] {
+    width: 36px; height: 30px; border: none; padding: 0; background: none; cursor: pointer;
+  }
+  .color code { font-size: 13px; color: var(--muted); }
+
+  .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .range-head { display: flex; justify-content: space-between; gap: 8px; }
+  .range-head span { white-space: nowrap; }
+  .range-head span { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .preset {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 2px solid var(--panel);
+    box-shadow: 0 0 0 1px var(--line);
+    cursor: pointer;
+  }
+
+  /* Prévia */
+  .preview { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 14px; }
+  #qr-box {
+    display: grid; place-items: center;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    background-color: #fff;
+    background-image:
+      linear-gradient(45deg, #eee 25%, transparent 25%),
+      linear-gradient(-45deg, #eee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #eee 75%),
+      linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    overflow: hidden;
+  }
+  #qr-box canvas, #qr-box svg { width: 100% !important; height: auto !important; display: block; }
+
+  .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button {
+    font: inherit; font-weight: 700;
+    padding: 12px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--chip); color: var(--ink);
+  }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); grid-column: 1 / -1; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .warn { color: #b4532a; font-size: 13px; min-height: 1em; }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 0 16px 32px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Gerador de QR Code</h1>
+  <p>Cole um link, personalize e baixe. Tudo é gerado no seu navegador, nada é enviado para servidores.</p>
+</header>
+
+<main>
+  <div class="panel controls">
+
+    <section>
+      <h2>Conteúdo</h2>
+      <label class="field" for="data">Link ou texto</label>
+      <textarea id="data" rows="2" placeholder="https://exemplo.com">https://github.com</textarea>
+      <div class="hint">Links curtos geram QR codes mais simples e fáceis de ler.</div>
+    </section>
+
+    <section>
+      <h2>Formato dos pontos</h2>
+      <div class="chips" id="dotType">
+        <input type="radio" name="dot" id="d-square" value="square"><label for="d-square">Quadrado</label>
+        <input type="radio" name="dot" id="d-rounded" value="rounded" checked><label for="d-rounded">Arredondado</label>
+        <input type="radio" name="dot" id="d-extra" value="extra-rounded"><label for="d-extra">Bem arredondado</label>
+        <input type="radio" name="dot" id="d-dots" value="dots"><label for="d-dots">Bolinhas</label>
+        <input type="radio" name="dot" id="d-classy" value="classy"><label for="d-classy">Elegante</label>
+        <input type="radio" name="dot" id="d-classy-r" value="classy-rounded"><label for="d-classy-r">Elegante arredondado</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Cantos</h2>
+      <label class="field">Moldura externa</label>
+      <div class="chips" id="cornerSqType" style="margin-bottom:14px">
+        <input type="radio" name="csq" id="c-square" value="square"><label for="c-square">Quadrada</label>
+        <input type="radio" name="csq" id="c-extra" value="extra-rounded" checked><label for="c-extra">Arredondada</label>
+        <input type="radio" name="csq" id="c-dot" value="dot"><label for="c-dot">Círculo</label>
+        <input type="radio" name="csq" id="c-classy" value="classy"><label for="c-classy">Elegante</label>
+      </div>
+      <label class="field">Centro</label>
+      <div class="chips" id="cornerDotType">
+        <input type="radio" name="cdot" id="cd-square" value="square"><label for="cd-square">Quadrado</label>
+        <input type="radio" name="cdot" id="cd-dot" value="dot" checked><label for="cd-dot">Círculo</label>
+        <input type="radio" name="cdot" id="cd-rounded" value="rounded"><label for="cd-rounded">Arredondado</label>
+        <input type="radio" name="cdot" id="cd-classy" value="classy"><label for="cd-classy">Elegante</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Cores</h2>
+      <div class="presets" style="margin-bottom:14px" aria-label="Combinações prontas">
+        <button type="button" class="preset" title="Clássico" data-p="#000000,#000000,#000000,#ffffff" style="background:#000"></button>
+        <button type="button" class="preset" title="Floresta" data-p="#2f5d50,#1e3d34,#c97b4a,#f6f1e7" style="background:linear-gradient(135deg,#2f5d50,#c97b4a)"></button>
+        <button type="button" class="preset" title="Oceano" data-p="#1d4e89,#00a6a6,#0b2d55,#ffffff" style="background:linear-gradient(135deg,#1d4e89,#00a6a6)"></button>
+        <button type="button" class="preset" title="Pôr do sol" data-p="#d1495b,#edae49,#8c2f39,#fff8f0" style="background:linear-gradient(135deg,#d1495b,#edae49)"></button>
+        <button type="button" class="preset" title="Uva" data-p="#5b2a86,#b5179e,#3a0f5c,#ffffff" style="background:linear-gradient(135deg,#5b2a86,#b5179e)"></button>
+        <button type="button" class="preset" title="Neon no escuro" data-p="#39ff14,#00e5ff,#39ff14,#111111" style="background:linear-gradient(135deg,#39ff14,#111)"></button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label class="field" for="dotColor">Pontos</label>
+          <div class="color"><input type="color" id="dotColor" value="#2f5d50"><code>#2f5d50</code></div>
+        </div>
+        <div>
+          <label class="field" for="cornerColor">Cantos</label>
+          <div class="color"><input type="color" id="cornerColor" value="#c97b4a"><code>#c97b4a</code></div>
+        </div>
+        <div>
+          <label class="field" for="bgColor">Fundo</label>
+          <div class="color"><input type="color" id="bgColor" value="#ffffff"><code>#ffffff</code></div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:14px">
+        <label class="toggle"><input type="checkbox" id="useGradient"> Degradê nos pontos</label>
+        <div id="gradientOpts" class="row" hidden>
+          <div>
+            <label class="field" for="dotColor2">Segunda cor</label>
+            <div class="color"><input type="color" id="dotColor2" value="#1e3d34"><code>#1e3d34</code></div>
+          </div>
+          <div>
+            <label class="field" for="gradType">Tipo</label>
+            <select id="gradType">
+              <option value="linear">Linear</option>
+              <option value="radial">Radial (do centro)</option>
+            </select>
+          </div>
+          <div>
+            <div class="range-head"><label class="field" for="gradAngle">Ângulo</label><span id="gradAngleV">45°</span></div>
+            <input type="range" id="gradAngle" min="0" max="360" value="45">
+          </div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="transparentBg"> Fundo transparente</label>
+      </div>
+      <div class="warn" id="contrastWarn"></div>
+    </section>
+
+    <section>
+      <h2>Logo no centro</h2>
+      <input type="file" id="logo" accept="image/*">
+      <div class="row" style="margin-top:12px">
+        <div>
+          <div class="range-head"><label class="field" for="logoSize">Tamanho do logo</label><span id="logoSizeV">35%</span></div>
+          <input type="range" id="logoSize" min="15" max="50" value="35">
+        </div>
+        <div>
+          <div class="range-head"><label class="field" for="logoMargin">Espaço ao redor</label><span id="logoMarginV">6px</span></div>
+          <input type="range" id="logoMargin" min="0" max="20" value="6">
+        </div>
+      </div>
+      <label class="toggle" style="margin-top:10px"><input type="checkbox" id="hideDots" checked> Limpar pontos atrás do logo</label>
+      <button type="button" id="removeLogo" style="margin-top:12px" hidden>Remover logo</button>
+    </section>
+
+    <section>
+      <h2>Tamanho e leitura</h2>
+      <div class="row">
+        <div>
+          <div class="range-head"><label class="field" for="size">Resolução</label><span id="sizeV">1000 px</span></div>
+          <input type="range" id="size" min="300" max="3000" step="100" value="1000">
+        </div>
+        <div>
+          <div class="range-head"><label class="field" for="margin">Margem</label><span id="marginV">40 px</span></div>
+          <input type="range" id="margin" min="0" max="200" step="5" value="40">
+        </div>
+        <div>
+          <div class="range-head"><label class="field" for="corners">Cantos da imagem</label><span id="cornersV">0 px</span></div>
+          <input type="range" id="corners" min="0" max="200" step="5" value="0">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label class="field" for="ecl">Correção de erros</label>
+        <select id="ecl">
+          <option value="L">Baixa (7%) – QR mais simples</option>
+          <option value="M">Média (15%)</option>
+          <option value="Q" selected>Alta (25%)</option>
+          <option value="H">Máxima (30%) – melhor com logo</option>
+        </select>
+        <div class="hint">Quanto maior, mais o QR aguenta sujeira, dobras ou um logo por cima.</div>
+      </div>
+    </section>
+
+    <section>
+      <button type="button" id="reset">Restaurar padrão</button>
+    </section>
+  </div>
+
+  <aside class="panel preview">
+    <div id="qr-box" aria-label="Prévia do QR code"></div>
+    <div class="warn" id="emptyWarn"></div>
+    <div class="buttons">
+      <button type="button" class="primary" id="dlPng">Baixar PNG</button>
+      <button type="button" id="dlSvg">Baixar SVG</button>
+      <button type="button" id="copyPng">Copiar imagem</button>
+    </div>
+    <div class="hint" id="copyMsg" aria-live="polite"></div>
+  </aside>
+</main>
+
+<footer>Feito com <a href="https://github.com/kozakdenys/qr-code-styling" style="color:inherit">qr-code-styling</a>. Teste o QR com a câmera do celular antes de imprimir.</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+  let logoDataUrl = "";
+
+  // Mostra o hex ao lado de cada seletor de cor
+  document.querySelectorAll('input[type="color"]').forEach((el) => {
+    const code = el.parentElement.querySelector("code");
+    const sync = () => (code.textContent = el.value);
+    el.addEventListener("input", sync);
+    el._sync = sync;
+  });
+
+  // Prévia leve (400px); o download usa o tamanho escolhido
+  const PREVIEW = 400;
+
+  function buildOptions(size) {
+    const scale = size / Number($("size").value);
+    const useGrad = $("useGradient").checked;
+    const dotsColor = useGrad
+      ? {
+          gradient: {
+            type: $("gradType").value,
+            rotation: (Number($("gradAngle").value) * Math.PI) / 180,
+            colorStops: [
+              { offset: 0, color: $("dotColor").value },
+              { offset: 1, color: $("dotColor2").value },
+            ],
+          },
+        }
+      : { color: $("dotColor").value };
+
+    return {
+      width: size,
+      height: size,
+      type: "canvas",
+      data: $("data").value.trim() || " ",
+      margin: Math.round(Number($("margin").value) * scale),
+      image: logoDataUrl || undefined,
+      qrOptions: { errorCorrectionLevel: $("ecl").value },
+      dotsOptions: { type: radio("dot"), ...dotsColor },
+      cornersSquareOptions: { type: radio("csq"), color: $("cornerColor").value },
+      cornersDotOptions: { type: radio("cdot"), color: $("cornerColor").value },
+      backgroundOptions: {
+        color: $("transparentBg").checked ? "transparent" : $("bgColor").value,
+        round: Number($("corners").value) / Number($("size").value),
+      },
+      imageOptions: {
+        crossOrigin: "anonymous",
+        hideBackgroundDots: $("hideDots").checked,
+        imageSize: Number($("logoSize").value) / 100,
+        margin: Math.round(Number($("logoMargin").value) * scale),
+      },
+    };
+  }
+
+  const qr = new QRCodeStyling(buildOptions(PREVIEW));
+  qr.append($("qr-box"));
+
+  // Contraste: avisa quando o QR pode ficar difícil de ler
+  function lum(hex) {
+    const c = hex.match(/\w\w/g).map((x) => {
+      const v = parseInt(x, 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function ratio(a, b) {
+    const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (l1 + 0.05) / (l2 + 0.05);
+  }
+  function checkContrast() {
+    const msgs = [];
+    if ($("transparentBg").checked) {
+      msgs.push("Com fundo transparente, garanta que o QR fique sobre um fundo claro e liso.");
+    } else {
+      const bg = $("bgColor").value;
+      const cols = [$("dotColor").value, $("cornerColor").value];
+      if ($("useGradient").checked) cols.push($("dotColor2").value);
+      if (cols.some((c) => ratio(c, bg) < 3)) msgs.push("Pouco contraste entre o QR e o fundo: alguns celulares podem não conseguir ler.");
+      if (cols.every((c) => lum(c) > lum(bg))) msgs.push("QR claro em fundo escuro: nem todo leitor aceita cores invertidas.");
+    }
+    if (logoDataUrl && $("ecl").value !== "H" && Number($("logoSize").value) > 30)
+      msgs.push("Logo grande: use correção de erros Máxima para garantir a leitura.");
+    $("contrastWarn").textContent = msgs.join(" ");
+  }
+
+  let t;
+  function update() {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      $("gradientOpts").hidden = !$("useGradient").checked;
+      $("bgColor").disabled = $("transparentBg").checked;
+      $("removeLogo").hidden = !logoDataUrl;
+      const empty = !$("data").value.trim();
+      $("emptyWarn").textContent = empty ? "Digite um link ou texto para gerar o QR code." : "";
+      ["dlPng", "dlSvg", "copyPng"].forEach((id) => ($(id).disabled = empty));
+      qr.update(buildOptions(PREVIEW));
+      checkContrast();
+    }, 60);
+  }
+
+  // Rótulos dos sliders
+  const labels = {
+    size: (v) => `${v} px`, margin: (v) => `${v} px`, corners: (v) => `${v} px`,
+    logoSize: (v) => `${v}%`, logoMargin: (v) => `${v}px`, gradAngle: (v) => `${v}°`,
+  };
+  Object.entries(labels).forEach(([id, fmt]) => {
+    const show = () => ($(id + "V").textContent = fmt($(id).value));
+    $(id).addEventListener("input", show);
+    show();
+  });
+
+  document.querySelector(".controls").addEventListener("input", update);
+  document.querySelector(".controls").addEventListener("change", update);
+
+  // Combinações prontas
+  document.querySelectorAll(".preset").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const [a, b, c, bg] = btn.dataset.p.split(",");
+      $("dotColor").value = a; $("dotColor2").value = b; $("cornerColor").value = c; $("bgColor").value = bg;
+      $("useGradient").checked = a !== b;
+      $("transparentBg").checked = false;
+      document.querySelectorAll('input[type="color"]').forEach((el) => el._sync());
+      update();
+    })
+  );
+
+  // Logo
+  $("logo").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      logoDataUrl = reader.result;
+      $("ecl").value = "H"; // logo cobre parte do QR, então aumentamos a correção
+      update();
+    };
+    reader.readAsDataURL(file);
+  });
+  $("removeLogo").addEventListener("click", () => {
+    logoDataUrl = "";
+    $("logo").value = "";
+    update();
+  });
+
+  // Nome do arquivo a partir do link
+  function fileName() {
+    const txt = $("data").value.trim();
+    let base = "qrcode";
+    try { base = "qrcode-" + new URL(txt).hostname.replace(/^www\./, ""); } catch {}
+    return base.replace(/[^\w.-]+/g, "-").slice(0, 60);
+  }
+
+  async function exportQR(ext) {
+    const size = Number($("size").value);
+    const opts = buildOptions(size);
+    opts.type = ext === "svg" ? "svg" : "canvas";
+    const full = new QRCodeStyling(opts);
+    return full;
+  }
+
+  $("dlPng").addEventListener("click", async () => {
+    (await exportQR("png")).download({ name: fileName(), extension: "png" });
+  });
+  $("dlSvg").addEventListener("click", async () => {
+    (await exportQR("svg")).download({ name: fileName(), extension: "svg" });
+  });
+  $("copyPng").addEventListener("click", async () => {
+    const msg = $("copyMsg");
+    try {
+      const blob = await (await exportQR("png")).getRawData("png");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      msg.textContent = "Imagem copiada. É só colar onde quiser.";
+    } catch {
+      msg.textContent = "Seu navegador não permitiu copiar. Use o botão Baixar PNG.";
+    }
+    setTimeout(() => (msg.textContent = ""), 3500);
+  });
+
+  // Restaurar padrão
+  const defaults = {};
+  document.querySelectorAll(".controls input, .controls select, .controls textarea").forEach((el) => {
+    if (el.type === "file") return;
+    defaults[el.id || el.name + el.value] = el.type === "radio" || el.type === "checkbox" ? el.checked : el.value;
+  });
+  $("reset").addEventListener("click", () => {
+    document.querySelectorAll(".controls input, .controls select, .controls textarea").forEach((el) => {
+      if (el.type === "file") return (el.value = "");
+      const k = el.id || el.name + el.value;
+      if (el.type === "radio" || el.type === "checkbox") el.checked = defaults[k];
+      else el.value = defaults[k];
+      el.dispatchEvent(new Event("input"));
+    });
+    logoDataUrl = "";
+    update();
+  });
+
+  // Aceita ?url=... na barra de endereço para já abrir com um link preenchido
+  const param = new URLSearchParams(location.search).get("url");
+  if (param) $("data").value = param;
+
+  update();
+})();
+</script>
+</body>
+</html>
